@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 const createNoWindow = 0x08000000
@@ -38,4 +40,37 @@ $lnk.Save()`
 	)
 	hideWindow(cmd)
 	return cmd.Run()
+}
+
+// renameShortcut renames the desktop shortcut "<oldName>.lnk" to "<newName>.lnk", if there is one
+// that starts in workDir (one made for this folder).
+func renameShortcut(oldName, newName, workDir string) error {
+	desk, err := desktop()
+	if err != nil || !exists(filepath.Join(desk, oldName+".lnk")) {
+		return err
+	}
+	const script = `$desk = [Environment]::GetFolderPath("Desktop")
+$old = Join-Path $desk "$env:LNK_OLD.lnk"
+$shell = New-Object -ComObject WScript.Shell
+$was = $shell.CreateShortcut($old)
+if ($was.WorkingDirectory -ne $env:LNK_DIR) { exit 0 }
+$lnk = $shell.CreateShortcut((Join-Path $desk "$env:LNK_NEW.lnk"))
+$lnk.TargetPath = $was.TargetPath
+$lnk.Arguments = $was.Arguments
+$lnk.WorkingDirectory = $was.WorkingDirectory
+$lnk.Save()
+Remove-Item -Force $old`
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	cmd.Env = append(os.Environ(),
+		"LNK_OLD="+oldName,
+		"LNK_NEW="+newName,
+		"LNK_DIR="+filepath.Clean(workDir),
+	)
+	hideWindow(cmd)
+	return cmd.Run()
+}
+
+// desktop is the current user's desktop folder.
+func desktop() (string, error) {
+	return windows.KnownFolderPath(windows.FOLDERID_Desktop, 0)
 }

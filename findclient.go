@@ -12,13 +12,13 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/danotchuuy/RogueArenaLauncher/internal/client"
+	"github.com/danotchuuy/arena-siege-survivors-launcher/internal/client"
 )
 
-// prefRoot remembers the Rogue Arena folder when the launcher is not inside it.
+// prefRoot remembers the Arena Siege Survivors folder when the launcher is not inside it.
 const prefRoot = "clientRoot"
 
-// locateClient makes sure l.client points at a Rogue Arena folder: the launcher's own folder, the
+// locateClient makes sure l.client points at an Arena Siege Survivors folder: the launcher's own folder, the
 // one used last time, or one the player downloads or picks. It reports false if there is none.
 // Not on the UI goroutine.
 func (l *launcher) locateClient() bool {
@@ -45,11 +45,11 @@ func (l *launcher) rememberRoot() {
 	}
 }
 
-// findClient asks the player to download Rogue Arena or show where it is, until one works.
+// findClient asks the player to download Arena Siege Survivors or show where it is, until one works.
 func (l *launcher) findClient() bool {
 	const (
-		optDownload = "Download the latest Rogue Arena release into this folder"
-		optExisting = "Rogue Arena is already in this folder"
+		optDownload = "Download the latest Arena Siege Survivors release into this folder"
+		optExisting = "Arena Siege Survivors is already in this folder"
 	)
 	type choice struct {
 		download bool
@@ -59,15 +59,15 @@ func (l *launcher) findClient() bool {
 	// Download into the folder named with -root, or a new folder next to the launcher.
 	defaultDir := l.client.Root
 	if !l.explicitRoot {
-		defaultDir = filepath.Join(l.client.Root, "RogueArenaClient")
+		defaultDir = filepath.Join(l.client.Root, "ArenaSiegeSurvivorsClient")
 	}
-	l.say("Rogue Arena's game files were not found in " + l.client.Root + ".")
+	l.say("Arena Siege Survivors's game files were not found in " + l.client.Root + ".")
 
 	for problem := ""; ; {
 		answer := make(chan *choice, 1)
 		fyne.Do(func() {
-			help := widget.NewLabel("The launcher could not find Rogue Arena's game files (bin\\rogue-server.exe and bin\\benilla.exe). " +
-				"Download the latest release, or show the launcher where Rogue Arena is.")
+			help := widget.NewLabel("The launcher could not find Arena Siege Survivors's game files (bin\\siege-server.exe and bin\\benilla.exe). " +
+				"Download the latest release, or show the launcher where Arena Siege Survivors is.")
 			help.Wrapping = fyne.TextWrapWord
 			radio := widget.NewRadioGroup([]string{optDownload, optExisting}, nil)
 			radio.Required = true
@@ -93,7 +93,7 @@ func (l *launcher) findClient() bool {
 				p.Wrapping = fyne.TextWrapWord
 				items = append(items, widget.NewFormItem("", p))
 			}
-			d := dialog.NewForm("Rogue Arena not found", "Continue", "Quit", items, func(ok bool) {
+			d := dialog.NewForm("Arena Siege Survivors not found", "Continue", "Quit", items, func(ok bool) {
 				if !ok {
 					answer <- nil
 					return
@@ -119,10 +119,10 @@ func (l *launcher) findClient() bool {
 				continue
 			}
 			l.client.Root = c.dir
-			l.say("Using Rogue Arena in " + c.dir)
+			l.say("Using Arena Siege Survivors in " + c.dir)
 			return true
 		}
-		if err := l.installRogueArena(c.dir); err != nil {
+		if err := l.installGame(c.dir); err != nil {
 			if errors.Is(err, context.Canceled) {
 				problem = "The download was stopped."
 			} else {
@@ -134,24 +134,24 @@ func (l *launcher) findClient() bool {
 	}
 }
 
-// installRogueArena downloads the latest release into dir and points the launcher at it.
-func (l *launcher) installRogueArena(dir string) error {
-	ctx, finish := l.startJob("Rogue Arena is being downloaded. Stop and close the launcher?")
+// installGame downloads the latest release into dir and points the launcher at it.
+func (l *launcher) installGame(dir string) error {
+	ctx, finish := l.startJob("Arena Siege Survivors is being downloaded. Stop and close the launcher?")
 	defer finish()
 
-	l.say("Downloading the latest Rogue Arena into " + dir + "...")
-	l.showProgress("Downloading Rogue Arena...", true)
+	l.say("Downloading the latest Arena Siege Survivors into " + dir + "...")
+	l.showProgress("Downloading Arena Siege Survivors...", true)
 	report := l.progressReporter()
 	c := client.New(dir)
 	c.Log = l.say
-	err := c.Install(ctx, func(done, total int64) { report("Downloading Rogue Arena", done, total) })
+	err := c.Install(ctx, func(done, total int64) { report("Downloading Arena Siege Survivors", done, total) })
 	l.hideProgress()
 	if err != nil {
 		l.say("Error: " + err.Error())
 		return err
 	}
 	l.client.Root = dir
-	l.say(fmt.Sprintf("Rogue Arena v%s is installed in %s.", l.client.Release(), dir))
+	l.say(fmt.Sprintf("Arena Siege Survivors v%s is installed in %s.", l.client.Release(), dir))
 	l.showRelease()
 	return nil
 }

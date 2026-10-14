@@ -1,5 +1,5 @@
 // Package stonetavern downloads and updates the WoW 1.12.1 clients published at
-// https://stonetavern.app/clients. Rogue Arena reads its game files from a client's Data folder.
+// https://stonetavern.app/clients. Arena Siege Survivors reads its game files from a client's Data folder.
 package stonetavern
 
 import (
@@ -18,7 +18,7 @@ import (
 // ClientsURL is the page listing the clients.
 const ClientsURL = "https://stonetavern.app/clients"
 
-const userAgent = "RogueArenaLauncher (+https://github.com/danotchuuy/RogueArenaLauncher)"
+const userAgent = "ArenaSiegeSurvivorsLauncher (+https://github.com/danotchuuy/arena-siege-survivors-launcher)"
 
 var httpClient = http.DefaultClient
 

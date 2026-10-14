@@ -1,7 +1,8 @@
-// Command RogueArenaLauncher is a window for playing Rogue Arena: it does what the client's
-// "Play Rogue Arena.bat" and launcher.ps1 do (updates, first-start setup, starting the game), and
-// can download the WoW 1.12.1 client the game needs from stonetavern.app.
-// Put it in the RogueArenaClient folder, or point it there with -root.
+// Command ArenaSiegeSurvivorsLauncher is a window for playing Arena Siege Survivors (once called Rogue
+// Arena): it does what the client's "Play Arena Siege Survivors.bat" and launcher.ps1 do (updates,
+// first-start setup, starting the game), and can download the WoW 1.12.1 client the game needs
+// from stonetavern.app.
+// Put it in the ArenaSiegeSurvivorsClient folder, or point it there with -root.
 package main
 
 import (
@@ -22,14 +23,14 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/danotchuuy/RogueArenaLauncher/internal/client"
+	"github.com/danotchuuy/arena-siege-survivors-launcher/internal/client"
 )
 
 // version is set at build time (see the Makefile).
 var version = "dev"
 
 func main() {
-	rootFlag := flag.String("root", "", "the RogueArenaClient folder (default: the folder this launcher is in)")
+	rootFlag := flag.String("root", "", "the ArenaSiegeSurvivorsClient folder (default: the folder this launcher is in)")
 	flag.Parse()
 	root := *rootFlag
 	if root == "" {
@@ -38,6 +39,7 @@ func main() {
 		}
 	}
 
+	// The ID keeps the launcher's old name: its saved settings are filed under it.
 	a := app.NewWithID("io.github.danotchuuy.roguearenalauncher")
 	l := newLauncher(a, client.New(root))
 	l.explicitRoot = *rootFlag != ""
@@ -50,7 +52,7 @@ type launcher struct {
 	app    fyne.App
 	win    fyne.Window
 	client *client.Client
-	// explicitRoot is set when -root named the Rogue Arena folder, which is then not remembered.
+	// explicitRoot is set when -root named the Arena Siege Survivors folder, which is then not remembered.
 	explicitRoot bool
 
 	log      *widget.Label
@@ -79,7 +81,7 @@ type job struct {
 }
 
 func newLauncher(a fyne.App, c *client.Client) *launcher {
-	l := &launcher{app: a, client: c, win: a.NewWindow("Rogue Arena")}
+	l := &launcher{app: a, client: c, win: a.NewWindow("Arena Siege Survivors")}
 	c.Log = l.say
 
 	l.log = widget.NewLabel("")
@@ -105,7 +107,7 @@ func newLauncher(a fyne.App, c *client.Client) *launcher {
 	})
 	l.setButtons(false)
 
-	title := widget.NewLabelWithStyle("Rogue Arena", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle("Arena Siege Survivors", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	buttons := container.NewHBox(l.wowBtn, l.downloadBtn, l.updatesBtn, layout.NewSpacer(), l.play)
 	l.win.SetContent(container.NewBorder(title, container.NewVBox(l.busyBox, buttons), nil, nil, l.logBox))
 	l.win.Resize(fyne.NewSize(760, 460))
@@ -123,7 +125,7 @@ func (l *launcher) say(text string) {
 }
 
 func (l *launcher) showRelease() {
-	title := "Rogue Arena"
+	title := "Arena Siege Survivors"
 	if rel := l.client.Release(); rel != "" {
 		title += " v" + rel
 	}
@@ -157,7 +159,7 @@ func (l *launcher) task(fn func()) {
 
 // start runs the steps before the game can be played: updates, then the first-start setup.
 func (l *launcher) start() {
-	l.say("Rogue Arena Launcher " + version)
+	l.say("Arena Siege Survivors Launcher " + version)
 	cleanupLauncherUpdate()
 	if l.updateLauncher(false) {
 		return
@@ -169,7 +171,7 @@ func (l *launcher) start() {
 	l.update()
 
 	if !l.client.HasLogin() {
-		l.say("Welcome to Rogue Arena!")
+		l.say("Welcome to Arena Siege Survivors!")
 		l.askCharacter()
 	}
 	if user, _, err := l.client.Login(); err == nil {
@@ -185,7 +187,7 @@ func (l *launcher) start() {
 	l.setButtons(true)
 }
 
-// checkForUpdates looks for a new launcher, a new Rogue Arena and a new build of the downloaded WoW client.
+// checkForUpdates looks for a new launcher, a new Arena Siege Survivors and a new build of the downloaded WoW client.
 func (l *launcher) checkForUpdates() {
 	if l.updateLauncher(true) {
 		return
@@ -194,24 +196,28 @@ func (l *launcher) checkForUpdates() {
 	l.checkClientUpdate(true)
 }
 
-// update installs a newer version of Rogue Arena if there is one. Without internet the player
+// update installs a newer version of Arena Siege Survivors if there is one. Without internet the player
 // plays the version they have.
 func (l *launcher) update() {
-	l.say("Checking for Rogue Arena updates...")
+	l.say("Checking for Arena Siege Survivors updates...")
 	newer, err := l.client.CheckUpdate(context.Background())
 	if err != nil {
 		l.say("(Could not check for updates; playing the version you have.)")
 		return
 	}
 	if !newer {
-		l.say("Rogue Arena is up to date.")
+		l.say("Arena Siege Survivors is up to date.")
 		return
 	}
-	l.say("A new version of Rogue Arena is out: updating (your saves are kept)...")
-	l.showProgress("Updating Rogue Arena...", false)
+	if l.client.NeedsUpdate() {
+		l.say("Rogue Arena is now called Arena Siege Survivors: updating to it (your saves are kept)...")
+	} else {
+		l.say("A new version of Arena Siege Survivors is out: updating (your saves are kept)...")
+	}
+	l.showProgress("Updating Arena Siege Survivors...", false)
 	p := l.progressReporter()
 	err = l.client.Update(context.Background(), func(done, total int64) {
-		p("Downloading the Rogue Arena update", done, total)
+		p("Downloading the Arena Siege Survivors update", done, total)
 	})
 	l.hideProgress()
 	if err != nil {
@@ -287,7 +293,7 @@ func (l *launcher) askWoWData(problem string) {
 				wantsDownload = true
 				d.Hide() // answers the dialog with false; the callback sees wantsDownload
 			})
-			help := widget.NewLabel(`Rogue Arena needs the "Data" folder of a World of Warcraft 1.12.1 client (the one with dbc.MPQ, model.MPQ, patch.MPQ ...). Pick yours, or download a client.`)
+			help := widget.NewLabel(`Arena Siege Survivors needs the "Data" folder of a World of Warcraft 1.12.1 client (the one with dbc.MPQ, model.MPQ, patch.MPQ ...). Pick yours, or download a client.`)
 			help.Wrapping = fyne.TextWrapWord
 			items := []*widget.FormItem{
 				widget.NewFormItem("", help),
@@ -433,7 +439,7 @@ func (l *launcher) onClose() {
 		l.app.Quit()
 		return
 	}
-	dialog.ShowConfirm("Rogue Arena is busy", j.question, func(ok bool) {
+	dialog.ShowConfirm("Arena Siege Survivors is busy", j.question, func(ok bool) {
 		if !ok {
 			return
 		}

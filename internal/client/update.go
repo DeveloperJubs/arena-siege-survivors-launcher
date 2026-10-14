@@ -12,17 +12,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danotchuuy/RogueArenaLauncher/internal/unzip"
+	"github.com/danotchuuy/arena-siege-survivors-launcher/internal/unzip"
 )
 
-const updateZip = "RogueArenaClient-update.zip"
+const updateZip = "ArenaSiegeSurvivorsClient-update.zip"
 
-// DefaultReleases is where Rogue Arena releases are published, as a new client's update.txt
-// names it.
-var DefaultReleases = "https://github.com/unicornjubs1-create/RogueArena-Releases/releases/latest/download"
+// DefaultReleases is where Arena Siege Survivors releases are published, as a new client's
+// update.txt names it.
+var DefaultReleases = "https://github.com/DeveloperJubs/ArenaSiegeSurvivors-Releases/releases/latest/download"
+
+// oldReleases is where the game was published while it was called Rogue Arena. Folders from then
+// still name it in update.txt; they are updated from DefaultReleases instead.
+const oldReleases = "https://github.com/unicornjubs1-create/RogueArena-Releases/releases/latest/download"
 
 // keep lists the player's own files, which an update never overwrites (slash-separated).
-var keep = []string{"login.txt", "wow-data.txt", "game/data", "Play Rogue Arena.bat"}
+var keep = []string{"login.txt", "wow-data.txt", "game/data", "Play Arena Siege Survivors.bat"}
 
 // Progress is called while downloading; total is -1 when the size is unknown.
 type Progress func(done, total int64)
@@ -30,7 +34,11 @@ type Progress func(done, total int64)
 // updateBase is the release URL from update.txt, or "" when updates are off.
 func (c *Client) updateBase() string {
 	s, _ := readTrimmed(c.path("update.txt"))
-	return strings.TrimRight(s, "/")
+	s = strings.TrimRight(s, "/")
+	if strings.EqualFold(s, oldReleases) {
+		return DefaultReleases
+	}
+	return s
 }
 
 // CheckUpdate reports whether update.txt's release site has a newer version.txt than this folder.
@@ -93,7 +101,7 @@ func (c *Client) fetchAndUnpack(ctx context.Context, base string, skip func(rel 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	tmp, err := os.CreateTemp("", "rogue-arena-update-*.zip")
+	tmp, err := os.CreateTemp("", "arena-siege-survivors-update-*.zip")
 	if err != nil {
 		return err
 	}
@@ -161,7 +169,7 @@ func (p *progressReader) Read(b []byte) (int, error) {
 }
 
 // installZip unpacks zipPath over root, keeping the player's files. The release zip holds one
-// folder (RogueArenaClient\...), whose contents go straight into root.
+// folder (ArenaSiegeSurvivorsClient\...), whose contents go straight into root.
 func installZip(zipPath, root string) error {
 	return unzip.Extract(context.Background(), zipPath, root, unzip.Options{Skip: kept})
 }
