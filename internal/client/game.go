@@ -15,6 +15,9 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
+// GameCloseTimeout is how long the game gets to close when Play's ctx is cancelled.
+const GameCloseTimeout = 5 * time.Second
+
 var (
 	serverExe = filepath.Join("bin", "rogue-server.exe")
 	gameExe   = filepath.Join("bin", "benilla.exe")
@@ -47,13 +50,20 @@ func (c *Client) Play(ctx context.Context) error {
 
 	stopServer, err := c.startServer(ctx)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil // stopped before the game started
+		}
 		return err
 	}
 	defer stopServer()
 
 	// The game: the player's WoW files (read only), this game's ability changes mounted on top
 	// of them (rogue\), its addons and settings in benilla-config\.
+	// Cancelling ctx asks the game to close, as its window's close button would, and forces it
+	// if it is still open GameCloseTimeout later.
 	cmd := exec.CommandContext(ctx, c.path(gameExe))
+	cmd.Cancel = func() error { return askToClose(cmd.Process) }
+	cmd.WaitDelay = GameCloseTimeout
 	cmd.Dir = game
 	cmd.Env = append(os.Environ(),
 		"WOW_DATA="+wow,

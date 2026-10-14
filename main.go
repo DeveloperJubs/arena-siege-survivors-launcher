@@ -29,16 +29,18 @@ import (
 var version = "dev"
 
 func main() {
-	root := flag.String("root", "", "the RogueArenaClient folder (default: the folder this launcher is in)")
+	rootFlag := flag.String("root", "", "the RogueArenaClient folder (default: the folder this launcher is in)")
 	flag.Parse()
-	if *root == "" {
+	root := *rootFlag
+	if root == "" {
 		if exe, err := os.Executable(); err == nil {
-			*root = filepath.Dir(exe)
+			root = filepath.Dir(exe)
 		}
 	}
 
 	a := app.NewWithID("io.github.danotchuuy.roguearenalauncher")
-	l := newLauncher(a, client.New(*root))
+	l := newLauncher(a, client.New(root))
+	l.explicitRoot = *rootFlag != ""
 	l.win.Show()
 	go l.start()
 	a.Run()
@@ -48,6 +50,8 @@ type launcher struct {
 	app    fyne.App
 	win    fyne.Window
 	client *client.Client
+	// explicitRoot is set when -root named the Rogue Arena folder, which is then not remembered.
+	explicitRoot bool
 
 	log      *widget.Label
 	logLines []string
@@ -128,15 +132,18 @@ func (l *launcher) showRelease() {
 
 // setButtons turns all the buttons on or off. Safe from any goroutine.
 func (l *launcher) setButtons(on bool) {
-	fyne.Do(func() {
-		for _, b := range []*widget.Button{l.play, l.wowBtn, l.downloadBtn, l.updatesBtn} {
-			if on {
-				b.Enable()
-			} else {
-				b.Disable()
-			}
+	fyne.Do(func() { l.enableButtons(on) })
+}
+
+// enableButtons is setButtons on the UI goroutine.
+func (l *launcher) enableButtons(on bool) {
+	for _, b := range []*widget.Button{l.play, l.wowBtn, l.downloadBtn, l.updatesBtn} {
+		if on {
+			b.Enable()
+		} else {
+			b.Disable()
 		}
-	})
+	}
 }
 
 // task runs fn in the background with the buttons off. Called from the UI goroutine.
@@ -150,11 +157,10 @@ func (l *launcher) task(fn func()) {
 
 // start runs the steps before the game can be played: updates, then the first-start setup.
 func (l *launcher) start() {
-	if err := l.client.Check(); err != nil {
-		l.fatal(fmt.Errorf("%v.\nPut this launcher in the RogueArenaClient folder, or start it with -root <folder>", err))
+	l.say("Rogue Arena Launcher " + version)
+	if !l.locateClient() {
 		return
 	}
-	l.say("Rogue Arena Launcher " + version)
 	l.showRelease()
 	l.update()
 
@@ -366,9 +372,11 @@ func (l *launcher) cancelJob() {
 	}
 }
 
+// onPlay starts the game. While it runs, the Play button becomes a "Close game" button.
 func (l *launcher) onPlay() {
-	l.setButtons(false)
 	ctx, finish := l.startJob("Closing the launcher closes the game too. Close it?")
+	l.enableButtons(false)
+	l.setPlayButton(true)
 	go func() {
 		err := l.client.Play(ctx)
 		finish()
@@ -378,8 +386,35 @@ func (l *launcher) onPlay() {
 		} else {
 			l.say("The game closed.")
 		}
-		l.setButtons(true)
+		fyne.Do(func() {
+			l.setPlayButton(false)
+			l.enableButtons(true)
+		})
 	}()
+}
+
+// setPlayButton makes the Play button a "Close game" button while the game runs, and back.
+func (l *launcher) setPlayButton(running bool) {
+	if running {
+		l.play.SetText("Close game")
+		l.play.SetIcon(theme.MediaStopIcon())
+		l.play.Importance = widget.DangerImportance
+		l.play.OnTapped = l.onCloseGame
+		l.play.Enable()
+	} else {
+		l.play.SetText("Play")
+		l.play.SetIcon(theme.MediaPlayIcon())
+		l.play.Importance = widget.HighImportance
+		l.play.OnTapped = l.onPlay
+	}
+	l.play.Refresh()
+}
+
+// onCloseGame closes the running game, which also stops the game server.
+func (l *launcher) onCloseGame() {
+	l.say("Closing the game...")
+	l.play.Disable()
+	l.cancelJob()
 }
 
 // onClose stops the game or download along with the launcher, after asking.
@@ -399,7 +434,7 @@ func (l *launcher) onClose() {
 		go func() {
 			select {
 			case <-j.done:
-			case <-time.After(5 * time.Second):
+			case <-time.After(client.GameCloseTimeout + 5*time.Second):
 			}
 			fyne.Do(l.app.Quit)
 		}()
@@ -457,14 +492,4 @@ func formatBytes(n int64) string {
 	default:
 		return fmt.Sprintf("%d KB", n>>10)
 	}
-}
-
-// fatal shows an error the launcher cannot get past, then quits.
-func (l *launcher) fatal(err error) {
-	l.say("Error: " + err.Error())
-	fyne.Do(func() {
-		d := dialog.NewError(err, l.win)
-		d.SetOnClosed(l.app.Quit)
-		d.Show()
-	})
 }

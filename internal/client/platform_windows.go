@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
@@ -12,6 +13,13 @@ const createNoWindow = 0x08000000
 // hideWindow keeps a console program from opening a console window of its own.
 func hideWindow(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
+}
+
+// askToClose asks a program to close its windows, as their close buttons would.
+func askToClose(p *os.Process) error {
+	cmd := exec.Command("taskkill", "/PID", strconv.Itoa(p.Pid))
+	hideWindow(cmd)
+	return cmd.Run()
 }
 
 // createShortcut puts "<name>.lnk" on the desktop, pointing at target.

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,6 +16,10 @@ import (
 )
 
 const updateZip = "RogueArenaClient-update.zip"
+
+// DefaultReleases is where Rogue Arena releases are published, as a new client's update.txt
+// names it.
+var DefaultReleases = "https://github.com/unicornjubs1-create/RogueArena-Releases/releases/latest/download"
 
 // keep lists the player's own files, which an update never overwrites (slash-separated).
 var keep = []string{"login.txt", "wow-data.txt", "game/data", "Play Rogue Arena.bat"}
@@ -55,6 +60,36 @@ func (c *Client) Update(ctx context.Context, progress Progress) error {
 	if base == "" {
 		return errors.New("no update.txt")
 	}
+	return c.fetchAndUnpack(ctx, base, kept, progress)
+}
+
+// Install downloads the latest release from DefaultReleases (or this folder's update.txt, if it
+// has one) and unpacks it into Root, which is made if needed. Files the player already has there
+// (see keep) are left alone.
+func (c *Client) Install(ctx context.Context, progress Progress) error {
+	if err := os.MkdirAll(c.Root, 0o755); err != nil {
+		return err
+	}
+	base := c.updateBase()
+	if base == "" {
+		base = DefaultReleases
+	}
+	skip := func(rel string) bool {
+		if !kept(rel) {
+			return false
+		}
+		_, err := os.Stat(c.path(filepath.FromSlash(rel)))
+		return err == nil
+	}
+	if err := c.fetchAndUnpack(ctx, base, skip, progress); err != nil {
+		return err
+	}
+	return c.Check()
+}
+
+// fetchAndUnpack downloads the release zip from base and unpacks it into Root, leaving out the
+// files skip names.
+func (c *Client) fetchAndUnpack(ctx context.Context, base string, skip func(rel string) bool, progress Progress) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
@@ -71,7 +106,7 @@ func (c *Client) Update(ctx context.Context, progress Progress) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return installZip(tmp.Name(), c.Root)
+	return unzip.Extract(ctx, tmp.Name(), c.Root, unzip.Options{Skip: skip})
 }
 
 func get(ctx context.Context, url string) (io.ReadCloser, error) {

@@ -29,6 +29,10 @@ build are recorded in `stonetavern-client.json` there, so at every start (and wi
 Put `RogueArenaLauncher.exe` in the `RogueArenaClient` folder and run it, or point it at the
 folder: `RogueArenaLauncher.exe -root C:\Games\RogueArenaClient`.
 
+If the launcher finds no Rogue Arena files there, it offers to download the latest release
+(into a `RogueArenaClient` folder next to the launcher, or a folder you pick) or to use a folder
+where Rogue Arena already is. The folder is remembered for the next start.
+
 ## Build and release
 
     make build                  # dist/RogueArenaLauncher.exe and dist/SHA256SUMS
