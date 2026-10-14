@@ -158,6 +158,10 @@ func (l *launcher) task(fn func()) {
 // start runs the steps before the game can be played: updates, then the first-start setup.
 func (l *launcher) start() {
 	l.say("Rogue Arena Launcher " + version)
+	cleanupLauncherUpdate()
+	if l.updateLauncher(false) {
+		return
+	}
 	if !l.locateClient() {
 		return
 	}
@@ -181,8 +185,11 @@ func (l *launcher) start() {
 	l.setButtons(true)
 }
 
-// checkForUpdates looks for a new Rogue Arena and a new build of the downloaded WoW client.
+// checkForUpdates looks for a new launcher, a new Rogue Arena and a new build of the downloaded WoW client.
 func (l *launcher) checkForUpdates() {
+	if l.updateLauncher(true) {
+		return
+	}
 	l.update()
 	l.checkClientUpdate(true)
 }

@@ -33,6 +33,11 @@ If the launcher finds no Rogue Arena files there, it offers to download the late
 (into a `RogueArenaClient` folder next to the launcher, or a folder you pick) or to use a folder
 where Rogue Arena already is. The folder is remembered for the next start.
 
+The launcher also updates itself: at every start (and with **Check for updates**) it looks at
+this repository's latest GitHub release and, if it is newer, offers to download it (checked
+against the release's `SHA256SUMS`), swap it in and restart. Development builds (any version
+that is not a plain `vX.Y.Z`) never update themselves.
+
 ## Build and release
 
     make build                  # dist/RogueArenaLauncher.exe and dist/SHA256SUMS
