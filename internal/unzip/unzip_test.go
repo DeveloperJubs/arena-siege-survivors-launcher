@@ -12,7 +12,7 @@ func TestExtractRejectsEscapes(t *testing.T) {
 	zipPath := filepath.Join(t.TempDir(), "u.zip")
 	f, _ := os.Create(zipPath)
 	zw := zip.NewWriter(f)
-	zw.Create(`RogueArenaClient\..\..\evil.txt`)
+	zw.Create(`ArenaSiegeSurvivorsClient\..\..\evil.txt`)
 	zw.Close()
 	f.Close()
 	if err := Extract(context.Background(), zipPath, t.TempDir(), Options{}); err == nil {

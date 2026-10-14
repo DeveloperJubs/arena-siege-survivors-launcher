@@ -18,11 +18,11 @@ import (
 	"time"
 )
 
-// TestMain lets the test binary stand in for bin/rogue-server.exe and bin/benilla.exe: the tests
+// TestMain lets the test binary stand in for bin/siege-server.exe and bin/benilla.exe: the tests
 // link those names to it, and it acts by the name it was started as.
 func TestMain(m *testing.M) {
 	switch filepath.Base(os.Args[0]) {
-	case "rogue-server.exe":
+	case "siege-server.exe":
 		fakeServer()
 	case "benilla.exe":
 		fakeGame()
@@ -34,10 +34,10 @@ func TestMain(m *testing.M) {
 func fakeServer() {
 	if len(os.Args) == 3 && os.Args[1] == "add-friend" {
 		if os.Args[2] == "Taken" {
-			fmt.Println("rogue-server 0.01\nERROR That name is taken.")
+			fmt.Println("siege-server 0.01\nERROR That name is taken.")
 			os.Exit(1)
 		}
-		fmt.Println("rogue-server 0.01\nOK s3cret")
+		fmt.Println("siege-server 0.01\nOK s3cret")
 		return
 	}
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ServerPort))
@@ -57,7 +57,7 @@ func fakeServer() {
 
 func fakeGame() {
 	cwd, _ := os.Getwd()
-	for _, k := range []string{"WOW_DATA", "WOW_HOST", "WOW_USER", "WOW_PASS", "WOW_CHAR", "BENILLA_HOME", "BENILLA_ROGUE_PATCH"} {
+	for _, k := range []string{"WOW_DATA", "WOW_HOST", "WOW_USER", "WOW_PASS", "WOW_CHAR", "BENILLA_HOME", "BENILLA_SIEGE_PATCH"} {
 		fmt.Printf("%s=%s\n", k, os.Getenv(k))
 	}
 	fmt.Printf("CWD=%s\n", cwd)
@@ -74,7 +74,7 @@ func fakeGame() {
 	}
 }
 
-// newFolder makes a RogueArenaClient folder whose programs are the fakes above.
+// newFolder makes an ArenaSiegeSurvivorsClient folder whose programs are the fakes above.
 func newFolder(t *testing.T) *Client {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -165,12 +165,12 @@ func TestInstallZip(t *testing.T) {
 	f, _ := os.Create(zipPath)
 	zw := zip.NewWriter(f)
 	for name, body := range map[string]string{
-		`RogueArenaClient\version.txt`:          "2",
-		`RogueArenaClient\login.txt`:            "theirs",
-		`RogueArenaClient\game\data\save.db`:    "theirs",
-		`RogueArenaClient\game\content\x.txt`:   "new",
-		`RogueArenaClient\Play Rogue Arena.bat`: "theirs",
-		`RogueArenaClient\game\`:                "",
+		`ArenaSiegeSurvivorsClient\version.txt`:                    "2",
+		`ArenaSiegeSurvivorsClient\login.txt`:                      "theirs",
+		`ArenaSiegeSurvivorsClient\game\data\save.db`:              "theirs",
+		`ArenaSiegeSurvivorsClient\game\content\x.txt`:             "new",
+		`ArenaSiegeSurvivorsClient\Play Arena Siege Survivors.bat`: "theirs",
+		`ArenaSiegeSurvivorsClient\game\`:                          "",
 	} {
 		w, _ := zw.Create(name)
 		w.Write([]byte(body))
@@ -182,11 +182,11 @@ func TestInstallZip(t *testing.T) {
 		t.Fatal(err)
 	}
 	for rel, want := range map[string]string{
-		"version.txt":          "2",
-		"login.txt":            "mine",
-		"game/data/save.db":    "mine",
-		"game/content/x.txt":   "new",
-		"Play Rogue Arena.bat": "",
+		"version.txt":                    "2",
+		"login.txt":                      "mine",
+		"game/data/save.db":              "mine",
+		"game/content/x.txt":             "new",
+		"Play Arena Siege Survivors.bat": "",
 	} {
 		b, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if string(b) != want {
@@ -222,7 +222,7 @@ func TestPlay(t *testing.T) {
 		"WOW_PASS=s3cret",
 		"WOW_CHAR=thrall",
 		"BENILLA_HOME=" + filepath.Join(c.Root, "benilla-config"),
-		"BENILLA_ROGUE_PATCH=" + filepath.Join(c.Root, "rogue"),
+		"BENILLA_SIEGE_PATCH=" + filepath.Join(c.Root, "siege"),
 		"CWD=" + filepath.Join(c.Root, "game"),
 	} {
 		if !strings.Contains(string(got), want+"\n") {
@@ -238,12 +238,12 @@ func TestInstall(t *testing.T) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	for name, body := range map[string]string{
-		`RogueArenaClient\bin\rogue-server.exe`:  "server",
-		`RogueArenaClient\bin\benilla.exe`:       "game",
-		`RogueArenaClient\version.txt`:           "202610140845",
-		`RogueArenaClient\wow-data.txt`:          "theirs",
-		`RogueArenaClient\Play Rogue Arena.bat`:  "bat",
-		`RogueArenaClient\game\data\starter.txt`: "starter",
+		`ArenaSiegeSurvivorsClient\bin\siege-server.exe`:           "server",
+		`ArenaSiegeSurvivorsClient\bin\benilla.exe`:                "game",
+		`ArenaSiegeSurvivorsClient\version.txt`:                    "202610140845",
+		`ArenaSiegeSurvivorsClient\wow-data.txt`:                   "theirs",
+		`ArenaSiegeSurvivorsClient\Play Arena Siege Survivors.bat`: "bat",
+		`ArenaSiegeSurvivorsClient\game\data\starter.txt`:          "starter",
 	} {
 		w, _ := zw.Create(name)
 		w.Write([]byte(body))
@@ -263,7 +263,7 @@ func TestInstall(t *testing.T) {
 
 	// A folder that does not exist yet, and one where the player already has a WoW folder saved.
 	for _, mine := range []bool{false, true} {
-		root := filepath.Join(t.TempDir(), "RogueArenaClient")
+		root := filepath.Join(t.TempDir(), "ArenaSiegeSurvivorsClient")
 		if mine {
 			os.MkdirAll(root, 0o755)
 			os.WriteFile(filepath.Join(root, "wow-data.txt"), []byte("mine"), 0o644)
@@ -282,7 +282,7 @@ func TestInstall(t *testing.T) {
 		if c.LocalVersion() != 202610140845 {
 			t.Errorf("LocalVersion() = %d", c.LocalVersion())
 		}
-		want := map[string]string{"Play Rogue Arena.bat": "bat", "game/data/starter.txt": "starter", "wow-data.txt": "theirs"}
+		want := map[string]string{"Play Arena Siege Survivors.bat": "bat", "game/data/starter.txt": "starter", "wow-data.txt": "theirs"}
 		if mine {
 			want["wow-data.txt"] = "mine"
 		}
@@ -336,5 +336,62 @@ func TestCloseGame(t *testing.T) {
 	}
 	if listening(ServerPort) {
 		t.Error("the server is still running after the game closed")
+	}
+}
+
+func TestOldName(t *testing.T) {
+	root := t.TempDir()
+	write := func(rel, s string) {
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte(s), 0o644)
+	}
+	read := func(rel string) string {
+		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			return "(missing)"
+		}
+		return string(b)
+	}
+	// A Rogue Arena folder.
+	write("bin/rogue-server.exe", "")
+	write("bin/benilla.exe", "")
+	write("update.txt", oldReleases+"/\r\n")
+	write("benilla-config/saved/RogueMenu.lua", "RogueMenuDB = { RogueUI_Scale = 1, label = \"Rogue Arena\" }")
+	write("benilla-config/saved/SiegeUI.lua", "kept")
+	write("benilla-config/saved/RogueUI.lua", "RogueUIDB = {}")
+	write("benilla-config/AddOns/RogueMeter/RogueMeter.toc", "")
+	write("benilla-config/WTF/Account/THRALL/Rogue_Arena-Thrall.lua", "layout")
+
+	c := New(root)
+	if err := c.Check(); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if !c.NeedsUpdate() {
+		t.Error("a Rogue Arena folder does not need an update")
+	}
+	if got := c.updateBase(); got != DefaultReleases {
+		t.Errorf("updateBase() = %q, want %q", got, DefaultReleases)
+	}
+	if err := c.Play(context.Background()); err == nil || !strings.Contains(err.Error(), "update it first") {
+		t.Errorf("Play = %v, want an update-first error", err)
+	}
+
+	// The update brings siege-server; the next Play moves the old names over.
+	write("bin/siege-server.exe", "")
+	if c.NeedsUpdate() {
+		t.Error("an updated folder still needs an update")
+	}
+	c.moveOldNames()
+	for rel, want := range map[string]string{
+		"benilla-config/saved/SiegeMenu.lua":                                 "SiegeMenuDB = { SiegeUI_Scale = 1, label = \"Rogue Arena\" }",
+		"benilla-config/saved/SiegeUI.lua":                                   "kept",
+		"benilla-config/WTF/Account/THRALL/Arena_Siege_Survivors-Thrall.lua": "layout",
+		"benilla-config/AddOns/RogueMeter/RogueMeter.toc":                    "(missing)",
+		"bin/rogue-server.exe":                                               "(missing)",
+	} {
+		if got := read(rel); got != want {
+			t.Errorf("%s = %q, want %q", rel, got, want)
+		}
 	}
 }

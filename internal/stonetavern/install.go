@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/danotchuuy/RogueArenaLauncher/internal/unzip"
+	"github.com/danotchuuy/arena-siege-survivors-launcher/internal/unzip"
 )
 
 // stateFile, in an install folder, records which edition and build it holds.

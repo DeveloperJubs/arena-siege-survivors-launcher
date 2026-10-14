@@ -18,6 +18,9 @@ var (
 	wowFiles = []string{"dbc.MPQ", "patch.MPQ"}
 )
 
+// shortcutName is the desktop shortcut to the launcher.
+const shortcutName = "Arena Siege Survivors"
+
 // CharacterName checks a typed character name (2-12 letters) and capitalizes it: "tHRALL" is
 // "Thrall".
 func CharacterName(typed string) (string, error) {
@@ -106,7 +109,7 @@ func (c *Client) WoWData() string {
 }
 
 // SetWoWData checks and saves the WoW "Data" folder. The first time, it also puts a
-// "Rogue Arena" shortcut to this launcher on the desktop.
+// "Arena Siege Survivors" shortcut to this launcher on the desktop.
 func (c *Client) SetWoWData(dir string) error {
 	dir = strings.Trim(strings.TrimSpace(dir), `"`)
 	if dir != "" {
@@ -122,7 +125,7 @@ func (c *Client) SetWoWData(dir string) error {
 	}
 	if first {
 		if exe, err := os.Executable(); err == nil {
-			if err := createShortcut("Rogue Arena", exe, c.Root); err != nil {
+			if err := createShortcut(shortcutName, exe, c.Root); err != nil {
 				c.logf("(Could not put a shortcut on the desktop: %v)", err)
 			}
 		}

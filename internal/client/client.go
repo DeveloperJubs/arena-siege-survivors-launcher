@@ -1,4 +1,4 @@
-// Package client drives a RogueArenaClient folder the way its launcher.ps1 does: updates, the
+// Package client drives an ArenaSiegeSurvivorsClient folder the way its launcher.ps1 does: updates, the
 // first-start setup (character and WoW files), and running the game server and the game.
 package client
 
@@ -10,10 +10,10 @@ import (
 	"strings"
 )
 
-// ServerPort is where rogue-server listens and benilla connects, on 127.0.0.1.
+// ServerPort is where siege-server listens and benilla connects, on 127.0.0.1.
 const ServerPort = 3725
 
-// Client is one RogueArenaClient folder.
+// Client is one ArenaSiegeSurvivorsClient folder.
 type Client struct {
 	Root string
 	// Log receives progress messages meant for the player. It may be nil.
@@ -34,14 +34,24 @@ func (c *Client) logf(format string, args ...any) {
 	}
 }
 
-// Check reports whether Root looks like a RogueArenaClient folder.
+// Check reports whether Root looks like an ArenaSiegeSurvivorsClient folder, or a
+// RogueArenaClient folder from before the rename (see NeedsUpdate).
 func (c *Client) Check() error {
-	for _, f := range []string{serverExe, gameExe} {
-		if _, err := os.Stat(c.path(f)); err != nil {
-			return fmt.Errorf("%s is not a Rogue Arena folder (no %s)", c.Root, f)
-		}
+	if !c.exists(gameExe) || !(c.exists(serverExe) || c.exists(oldServerExe)) {
+		return fmt.Errorf("%s is not an Arena Siege Survivors folder (no %s and %s)", c.Root, serverExe, gameExe)
 	}
 	return nil
+}
+
+// NeedsUpdate reports whether the folder still has Rogue Arena, the game before it was renamed,
+// which must be updated before it can be played.
+func (c *Client) NeedsUpdate() bool {
+	return !c.exists(serverExe) && c.exists(oldServerExe)
+}
+
+func (c *Client) exists(rel string) bool {
+	_, err := os.Stat(c.path(rel))
+	return err == nil
 }
 
 // Release is the release number from release.txt (0.01, 0.02 ...), or "" if unknown.

@@ -19,14 +19,18 @@ import (
 const GameCloseTimeout = 5 * time.Second
 
 var (
-	serverExe = filepath.Join("bin", "rogue-server.exe")
-	gameExe   = filepath.Join("bin", "benilla.exe")
+	serverExe    = filepath.Join("bin", "siege-server.exe")
+	oldServerExe = filepath.Join("bin", "rogue-server.exe") // from when the game was Rogue Arena
+	gameExe      = filepath.Join("bin", "benilla.exe")
 )
 
 // Play runs the game server in the background and then the game, logged straight in as the
 // player's character, and returns when the game closes (or ctx is cancelled, which closes it).
 // The server is always stopped on return.
 func (c *Client) Play(ctx context.Context) error {
+	if c.NeedsUpdate() {
+		return errors.New("this folder still has Rogue Arena, the game's old version: update it first (Check for updates)")
+	}
 	user, pass, err := c.Login()
 	if err != nil {
 		return errors.New("no character yet: name one first")
@@ -39,6 +43,7 @@ func (c *Client) Play(ctx context.Context) error {
 	if err := os.MkdirAll(filepath.Join(game, "data"), 0o755); err != nil {
 		return err
 	}
+	c.moveOldNames()
 	c.removeLeftovers()
 	if err := c.stopOldServers(ctx); err != nil {
 		return err
@@ -58,7 +63,7 @@ func (c *Client) Play(ctx context.Context) error {
 	defer stopServer()
 
 	// The game: the player's WoW files (read only), this game's ability changes mounted on top
-	// of them (rogue\), its addons and settings in benilla-config\.
+	// of them (siege\), its addons and settings in benilla-config\.
 	// Cancelling ctx asks the game to close, as its window's close button would, and forces it
 	// if it is still open GameCloseTimeout later.
 	cmd := exec.CommandContext(ctx, c.path(gameExe))
@@ -72,7 +77,7 @@ func (c *Client) Play(ctx context.Context) error {
 		"WOW_PASS="+pass,
 		"WOW_CHAR="+user,
 		"BENILLA_HOME="+c.path("benilla-config"),
-		"BENILLA_ROGUE_PATCH="+c.path("rogue"),
+		"BENILLA_SIEGE_PATCH="+c.path("siege"),
 	)
 	closeLogs, err := redirect(cmd, filepath.Join(game, "benilla-log.txt"), filepath.Join(game, "benilla-errors.txt"))
 	if err != nil {
@@ -90,22 +95,23 @@ func (c *Client) Play(ctx context.Context) error {
 	return nil
 }
 
-// removeLeftovers deletes files from the old browser version of the game.
+// removeLeftovers deletes files from the old browser version of the game, and the patch folder
+// from before the rename (now siege\).
 func (c *Client) removeLeftovers() {
 	_ = os.Remove(c.path("bin", "wenilla-host.exe"))
 	_ = os.RemoveAll(c.path("web"))
-	_ = os.RemoveAll(c.path("rogue", "AddOns"))
+	_ = os.RemoveAll(c.path("rogue"))
 }
 
-// stopOldServers makes sure nothing else holds the game's port. A rogue-server left running from
-// this folder is stopped; one from another copy of Rogue Arena would not know this character, so
-// the player is asked to close it.
+// stopOldServers makes sure nothing else holds the game's port. A game server (siege-server, or
+// rogue-server from before the rename) left running from this folder is stopped; one from another
+// copy of the game would not know this character, so the player is asked to close it.
 func (c *Client) stopOldServers(ctx context.Context) error {
 	procs, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("could not list running programs: %w", err)
 	}
-	server := c.path(serverExe)
+	server, oldServer := c.path(serverExe), c.path(oldServerExe)
 	for _, p := range procs {
 		name, err := p.NameWithContext(ctx)
 		if err != nil {
@@ -113,24 +119,24 @@ func (c *Client) stopOldServers(ctx context.Context) error {
 		}
 		switch strings.TrimSuffix(strings.ToLower(name), ".exe") {
 		case "benilla":
-			return errors.New("Rogue Arena is already running. Close the other game window first, then try again")
-		case "rogue-server":
+			return errors.New("Arena Siege Survivors is already running. Close the other game window first, then try again")
+		case "siege-server", "rogue-server":
 			exe, _ := p.ExeWithContext(ctx)
-			if exe != "" && samePath(exe, server) {
+			if exe != "" && (samePath(exe, server) || samePath(exe, oldServer)) {
 				_ = p.KillWithContext(ctx)
 				continue
 			}
-			return fmt.Errorf("another copy of Rogue Arena is still running in the background (%s). Close its window (or restart the PC), then try again", exe)
+			return fmt.Errorf("another copy of Arena Siege Survivors is still running in the background (%s). Close its window (or restart the PC), then try again", exe)
 		}
 	}
 	time.Sleep(300 * time.Millisecond)
 	if listening(ServerPort) {
-		return fmt.Errorf("something else on this PC is using port %d. Close other Rogue Arena or WoW server windows, then try again", ServerPort)
+		return fmt.Errorf("something else on this PC is using port %d. Close other Arena Siege Survivors or WoW server windows, then try again", ServerPort)
 	}
 	return nil
 }
 
-// startServer runs rogue-server with its saves in game\data and waits until it takes connections.
+// startServer runs siege-server with its saves in game\data and waits until it takes connections.
 // The returned func stops it.
 func (c *Client) startServer(ctx context.Context) (stop func(), err error) {
 	game := c.path("game")

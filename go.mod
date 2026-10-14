@@ -1,4 +1,4 @@
-module github.com/danotchuuy/RogueArenaLauncher
+module github.com/danotchuuy/arena-siege-survivors-launcher
 
 go 1.26.0
 
@@ -6,6 +6,7 @@ require (
 	fyne.io/fyne/v2 v2.8.2
 	github.com/shirou/gopsutil/v4 v4.26.9
 	golang.org/x/net v0.35.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
@@ -45,6 +46,5 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/image v0.24.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 )

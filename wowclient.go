@@ -12,7 +12,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/danotchuuy/RogueArenaLauncher/internal/stonetavern"
+	"github.com/danotchuuy/arena-siege-survivors-launcher/internal/stonetavern"
 )
 
 // installedClient returns the folder of the WoW client the game uses and what this launcher

@@ -1,24 +1,28 @@
-# Builds RogueArenaLauncher.exe and publishes it as a GitHub release.
+# Builds ArenaSiegeSurvivorsLauncher.exe and publishes it as a GitHub release.
 #
-#   make build                   dist/RogueArenaLauncher.exe and dist/SHA256SUMS
+#   make build                   dist/ArenaSiegeSurvivorsLauncher.exe and dist/SHA256SUMS
 #   make push VERSION=v0.1.0     build, tag v0.1.0, push the tag and upload the release
 #
 # Fyne needs cgo, so the Windows build uses MinGW-w64: the local one if installed, otherwise a
 # Docker image with it (build/windows.Dockerfile). "make push" needs the GitHub CLI (gh), logged in.
 
-APP      := RogueArenaLauncher
+APP      := ArenaSiegeSurvivorsLauncher
+# The launcher was RogueArenaLauncher. Launchers from then (v0.0.3 on) update themselves from the
+# release file of that name, so each release has a copy of the exe under it too.
+OLD_APP  := RogueArenaLauncher
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 DIST     := dist
 EXE      := $(DIST)/$(APP).exe
-ASSETS   := $(EXE) $(DIST)/SHA256SUMS
+OLD_EXE  := $(DIST)/$(OLD_APP).exe
+ASSETS   := $(EXE) $(OLD_EXE) $(DIST)/SHA256SUMS
 
 MINGW_CC := x86_64-w64-mingw32-gcc
 LDFLAGS  := -s -w -H=windowsgui -X main.version=$(VERSION)
 GO_BUILD := CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=$(MINGW_CC) \
 	go build -trimpath -ldflags '$(LDFLAGS)' -o $(EXE) .
 
-BUILDER_IMAGE := roguearenalauncher-builder:go1.26
-BUILD_CACHE   := $(HOME)/.cache/roguearenalauncher-build
+BUILDER_IMAGE := arena-siege-survivors-launcher-builder:go1.26
+BUILD_CACHE   := $(HOME)/.cache/arena-siege-survivors-launcher-build
 
 ifeq ($(shell command -v $(MINGW_CC) 2>/dev/null),)
 DOCKER_BUILD ?= 1
@@ -47,7 +51,8 @@ ifeq ($(DOCKER_BUILD),1)
 else
 	$(GO_BUILD)
 endif
-	cd $(DIST) && sha256sum $(APP).exe > SHA256SUMS
+	cp $(EXE) $(OLD_EXE)
+	cd $(DIST) && sha256sum $(APP).exe $(OLD_APP).exe > SHA256SUMS
 	@echo "Built $(EXE) ($(VERSION))"
 
 builder:

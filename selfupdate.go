@@ -8,12 +8,12 @@ import (
 
 	"fyne.io/fyne/v2"
 
-	"github.com/danotchuuy/RogueArenaLauncher/internal/selfupdate"
+	"github.com/danotchuuy/arena-siege-survivors-launcher/internal/selfupdate"
 )
 
 const (
-	launcherRepo  = "danotchuuy/RogueArenaLauncher"
-	launcherAsset = "RogueArenaLauncher.exe" // as "make push" uploads it
+	launcherRepo  = "danotchuuy/arena-siege-survivors-launcher"
+	launcherAsset = "ArenaSiegeSurvivorsLauncher.exe" // as "make push" uploads it
 )
 
 // launcherPath is the running launcher's file.
