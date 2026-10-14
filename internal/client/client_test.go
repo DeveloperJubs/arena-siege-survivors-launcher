@@ -2,14 +2,20 @@ package client
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // TestMain lets the test binary stand in for bin/rogue-server.exe and bin/benilla.exe: the tests
@@ -58,6 +64,13 @@ func fakeGame() {
 	if !listening(ServerPort) {
 		fmt.Fprintln(os.Stderr, "server not up")
 		os.Exit(3)
+	}
+	if os.Getenv("FAKE_GAME_STAYS_OPEN") != "" {
+		closing := make(chan os.Signal, 1)
+		signal.Notify(closing, syscall.SIGTERM)
+		fmt.Println("RUNNING")
+		<-closing
+		fmt.Println("ASKED TO CLOSE")
 	}
 }
 
@@ -215,6 +228,111 @@ func TestPlay(t *testing.T) {
 		if !strings.Contains(string(got), want+"\n") {
 			t.Errorf("game did not get %s; its log:\n%s", want, got)
 		}
+	}
+	if listening(ServerPort) {
+		t.Error("the server is still running after the game closed")
+	}
+}
+
+func TestInstall(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, body := range map[string]string{
+		`RogueArenaClient\bin\rogue-server.exe`:  "server",
+		`RogueArenaClient\bin\benilla.exe`:       "game",
+		`RogueArenaClient\version.txt`:           "202610140845",
+		`RogueArenaClient\wow-data.txt`:          "theirs",
+		`RogueArenaClient\Play Rogue Arena.bat`:  "bat",
+		`RogueArenaClient\game\data\starter.txt`: "starter",
+	} {
+		w, _ := zw.Create(name)
+		w.Write([]byte(body))
+	}
+	zw.Close()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/"+updateZip {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write(buf.Bytes())
+	}))
+	defer srv.Close()
+	old := DefaultReleases
+	DefaultReleases = srv.URL
+	defer func() { DefaultReleases = old }()
+
+	// A folder that does not exist yet, and one where the player already has a WoW folder saved.
+	for _, mine := range []bool{false, true} {
+		root := filepath.Join(t.TempDir(), "RogueArenaClient")
+		if mine {
+			os.MkdirAll(root, 0o755)
+			os.WriteFile(filepath.Join(root, "wow-data.txt"), []byte("mine"), 0o644)
+		}
+		c := New(root)
+		if err := c.Check(); err == nil {
+			t.Fatal("empty folder passes Check")
+		}
+		var reported int64
+		if err := c.Install(context.Background(), func(done, total int64) { reported = done }); err != nil {
+			t.Fatal(err)
+		}
+		if reported != int64(buf.Len()) {
+			t.Errorf("progress reached %d of %d bytes", reported, buf.Len())
+		}
+		if c.LocalVersion() != 202610140845 {
+			t.Errorf("LocalVersion() = %d", c.LocalVersion())
+		}
+		want := map[string]string{"Play Rogue Arena.bat": "bat", "game/data/starter.txt": "starter", "wow-data.txt": "theirs"}
+		if mine {
+			want["wow-data.txt"] = "mine"
+		}
+		for rel, w := range want {
+			if b, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))); string(b) != w {
+				t.Errorf("mine=%v: %s = %q, want %q", mine, rel, b, w)
+			}
+		}
+	}
+}
+
+func TestCloseGame(t *testing.T) {
+	if listening(ServerPort) {
+		t.Skipf("port %d is in use", ServerPort)
+	}
+	t.Setenv("FAKE_GAME_STAYS_OPEN", "1")
+	c := newFolder(t)
+	if err := c.CreateCharacter("Thrall"); err != nil {
+		t.Fatal(err)
+	}
+	wow := t.TempDir()
+	os.WriteFile(filepath.Join(wow, "dbc.MPQ"), nil, 0o644)
+	os.WriteFile(filepath.Join(wow, "patch.MPQ"), nil, 0o644)
+	if err := c.SetWoWData(wow); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- c.Play(ctx) }()
+	gameLog := filepath.Join(c.Root, "game", "benilla-log.txt")
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		if b, _ := os.ReadFile(gameLog); strings.Contains(string(b), "RUNNING") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the game did not start")
+		}
+	}
+
+	start := time.Now()
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("Play: %v", err)
+	}
+	if took := time.Since(start); took >= GameCloseTimeout {
+		t.Errorf("closing took %v: the game was forced instead of asked", took)
+	}
+	if b, _ := os.ReadFile(gameLog); !strings.Contains(string(b), "ASKED TO CLOSE") {
+		t.Errorf("the game was not asked to close; its log:\n%s", b)
 	}
 	if listening(ServerPort) {
 		t.Error("the server is still running after the game closed")
