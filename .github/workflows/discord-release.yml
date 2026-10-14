@@ -1,0 +1,17 @@
+name: Notify Discord on Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  discord-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Release Notification to Discord
+        uses: sharkdp/github-releases-to-discord@v2
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          # Optional configurations:
+          color: "3447003" # Decimal color code for the embed border
+          username: "Release Bot"
