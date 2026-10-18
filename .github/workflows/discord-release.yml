@@ -4,14 +4,36 @@ on:
   release:
     types: [published]
 
+permissions: {}
+
 jobs:
   discord-notify:
     runs-on: ubuntu-latest
     steps:
+      # Discord embeds take at most 4096 characters of description, so long release notes are cut.
+      - name: Shorten the release notes
+        id: notes
+        env:
+          BODY: ${{ github.event.release.body }}
+        run: |
+          if [ ${#BODY} -gt 3900 ]; then BODY="${BODY:0:3900}…"; fi
+          {
+            echo "body<<END_OF_NOTES_$GITHUB_RUN_ID"
+            echo "$BODY"
+            echo "END_OF_NOTES_$GITHUB_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Send Release Notification to Discord
-        uses: sharkdp/github-releases-to-discord@v2
+        uses: tsickert/discord-webhook@b217a69502f52803de774ded2b1ab7c282e99645 # v7.0.0
         with:
-          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
-          # Optional configurations:
-          color: "3447003" # Decimal color code for the embed border
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
           username: "Release Bot"
+          content: "A new launcher is out: **${{ github.event.release.name || github.event.release.tag_name }}**"
+          embed-title: ${{ github.event.release.name || github.event.release.tag_name }}
+          embed-url: ${{ github.event.release.html_url }}
+          embed-description: ${{ steps.notes.outputs.body }}
+          embed-timestamp: ${{ github.event.release.published_at }}
+          embed-color: 3447003 # decimal colour of the embed's border
+          embed-author-name: ${{ github.repository }}
+          embed-author-url: ${{ github.event.repository.html_url }}
+          embed-footer-text: "Download: ${{ github.event.repository.html_url }}/releases/latest"

@@ -395,3 +395,58 @@ func TestOldName(t *testing.T) {
 		}
 	}
 }
+
+// TestLatestReleaseEmpty is for a "latest" GitHub release published without its files: the update
+// comes from the newest release that has them.
+func TestLatestReleaseEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, body := range map[string]string{
+		`ArenaSiegeSurvivorsClient\bin\siege-server.exe`: "server",
+		`ArenaSiegeSurvivorsClient\bin\benilla.exe`:      "game",
+		`ArenaSiegeSurvivorsClient\version.txt`:          "202610180712",
+	} {
+		w, _ := zw.Create(name)
+		w.Write([]byte(body))
+	}
+	zw.Close()
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/dev/game/releases":
+			fmt.Fprintf(w, `[
+				{"tag_name": "v0.82", "assets": []},
+				{"tag_name": "v0.81.1", "prerelease": true, "assets": [
+					{"name": "version.txt", "browser_download_url": "%[1]s/dev/game/releases/download/v0.81.1/version.txt"},
+					{"name": %[2]q, "browser_download_url": "%[1]s/dev/game/releases/download/v0.81.1/%[2]s"}]},
+				{"tag_name": "v0.81", "assets": [
+					{"name": "version.txt", "browser_download_url": "%[1]s/dev/game/releases/download/v0.81/version.txt"},
+					{"name": %[2]q, "browser_download_url": "%[1]s/dev/game/releases/download/v0.81/%[2]s"}]}]`, srv.URL, updateZip)
+		case "/dev/game/releases/download/v0.81/version.txt":
+			fmt.Fprint(w, "202610180712\n")
+		case "/dev/game/releases/download/v0.81/" + updateZip:
+			w.Write(buf.Bytes())
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	old := GitHubAPI
+	GitHubAPI = srv.URL
+	defer func() { GitHubAPI = old }()
+
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "version.txt"), []byte("202610140845"), 0o644)
+	os.WriteFile(filepath.Join(root, "update.txt"), []byte(srv.URL+"/dev/game/releases/latest/download"), 0o644)
+	c := New(root)
+	newer, err := c.CheckUpdate(context.Background())
+	if err != nil || !newer {
+		t.Fatalf("CheckUpdate() = %v, %v", newer, err)
+	}
+	if err := c.Update(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if c.LocalVersion() != 202610180712 {
+		t.Errorf("LocalVersion() = %d", c.LocalVersion())
+	}
+}
