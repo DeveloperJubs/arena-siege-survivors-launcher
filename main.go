@@ -9,6 +9,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,6 +170,7 @@ func (l *launcher) start() {
 	}
 	l.showRelease()
 	l.update()
+	l.checkVCRedist()
 
 	if !l.client.HasLogin() {
 		l.say("Welcome to Arena Siege Survivors!")
@@ -226,6 +228,30 @@ func (l *launcher) update() {
 	}
 	l.showRelease()
 	l.say("Updated.")
+}
+
+// vcRedistURL is Microsoft's download of the latest Visual C++ Redistributable (x64).
+const vcRedistURL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+
+// checkVCRedist offers to download the Microsoft Visual C++ Redistributable (x64), which the game
+// needs, if it is not installed. Not on the UI goroutine.
+func (l *launcher) checkVCRedist() {
+	if client.VCRedistInstalled() {
+		return
+	}
+	l.say("The Microsoft Visual C++ Redistributable (x64) is not installed; the game needs it to start.")
+	question := "Arena Siege Survivors needs the Microsoft Visual C++ Redistributable (x64), which is not installed. Download it from Microsoft now?"
+	if !l.confirm("Microsoft Visual C++ Redistributable", question) {
+		l.say("(Without it the game may not start. It can be downloaded from " + vcRedistURL + ")")
+		return
+	}
+	u, _ := url.Parse(vcRedistURL)
+	fyne.Do(func() {
+		if err := l.app.OpenURL(u); err != nil {
+			l.say("Could not open the download (" + err.Error() + "); get it from " + vcRedistURL)
+		}
+	})
+	l.say("Run the downloaded vc_redist.x64.exe to install it, then press Play.")
 }
 
 // askCharacter asks for a character name until the game server accepts one.
@@ -395,6 +421,9 @@ func (l *launcher) onPlay() {
 		finish()
 		if err != nil {
 			l.say("Error: " + err.Error())
+			if !client.VCRedistInstalled() {
+				l.say("The Microsoft Visual C++ Redistributable (x64) is not installed, which may be why. Get it from " + vcRedistURL)
+			}
 			fyne.Do(func() { dialog.ShowError(err, l.win) })
 		} else {
 			l.say("The game closed.")

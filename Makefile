@@ -77,6 +77,8 @@ push: check-release build
 check-release:
 	@command -v gh >/dev/null || { echo "make push needs the GitHub CLI: https://cli.github.com"; exit 1; }
 	@gh auth status >/dev/null 2>&1 || { echo "Log in to GitHub first: gh auth login"; exit 1; }
+	@[ "$(origin VERSION)" != file ] || \
+		{ echo "Name the release: make push VERSION=v0.1.0 (the default, $(VERSION), is a git describe name)"; exit 1; }
 	@echo "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$' || \
 		{ echo "VERSION must be a release tag like v0.1.0 (got '$(VERSION)'): make push VERSION=v0.1.0"; exit 1; }
 	@git diff-index --quiet HEAD -- || { echo "Commit your changes before releasing."; exit 1; }

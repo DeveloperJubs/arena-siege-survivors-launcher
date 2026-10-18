@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 const createNoWindow = 0x08000000
@@ -73,4 +74,25 @@ Remove-Item -Force $old`
 // desktop is the current user's desktop folder.
 func desktop() (string, error) {
 	return windows.KnownFolderPath(windows.FOLDERID_Desktop, 0)
+}
+
+// vcRedistKey is where the Microsoft Visual C++ 2015-2022 Redistributable (x64) records itself.
+// Its installer is 32-bit, so the key can be in either registry view.
+const vcRedistKey = `SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64`
+
+// VCRedistInstalled reports whether the Microsoft Visual C++ Redistributable (x64), which the
+// game needs, is installed.
+func VCRedistInstalled() bool {
+	for _, view := range []uint32{registry.WOW64_64KEY, registry.WOW64_32KEY} {
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, vcRedistKey, registry.QUERY_VALUE|view)
+		if err != nil {
+			continue
+		}
+		installed, _, err := k.GetIntegerValue("Installed")
+		k.Close()
+		if err == nil && installed == 1 {
+			return true
+		}
+	}
+	return false
 }

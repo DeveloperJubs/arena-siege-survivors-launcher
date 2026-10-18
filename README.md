@@ -10,6 +10,9 @@ A [Fyne](https://fyne.io) window that does what the client's `Play Arena Siege S
    keeping `login.txt`, `wow-data.txt`, `game\data` and `Play Arena Siege Survivors.bat`.
 2. **First start**: asks for a character name (`siege-server.exe add-friend <Name>` writes
    `login.txt`) and the WoW 1.12.1 `Data` folder (`wow-data.txt`), and puts a desktop shortcut.
+   At every start it also checks that the Microsoft Visual C++ Redistributable (x64) is
+   installed (the `VC\Runtimes\x64` registry key), and if not, offers to download it from
+   Microsoft.
 3. **Play**: starts `bin\siege-server.exe` hidden (port 3725), waits for it, then runs
    `bin\benilla.exe` with `WOW_DATA`, `WOW_HOST`, `WOW_USER`, `WOW_PASS`, `WOW_CHAR`,
    `BENILLA_HOME` and `BENILLA_SIEGE_PATCH` set. When the game closes, the server is stopped.
