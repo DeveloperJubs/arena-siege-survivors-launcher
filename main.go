@@ -9,7 +9,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +17,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
@@ -42,6 +42,7 @@ func main() {
 
 	// The ID keeps the launcher's old name: its saved settings are filed under it.
 	a := app.NewWithID("io.github.danotchuuy.roguearenalauncher")
+	a.Settings().SetTheme(siegeTheme{})
 	l := newLauncher(a, client.New(root))
 	l.explicitRoot = *rootFlag != ""
 	l.win.Show()
@@ -54,7 +55,9 @@ type launcher struct {
 	win    fyne.Window
 	client *client.Client
 	// explicitRoot is set when -root named the Arena Siege Survivors folder, which is then not remembered.
-	explicitRoot bool
+	explicitRoot  bool
+	setupApproved bool
+	summary       *widget.Label
 
 	log      *widget.Label
 	logLines []string
@@ -108,10 +111,19 @@ func newLauncher(a fyne.App, c *client.Client) *launcher {
 	})
 	l.setButtons(false)
 
-	title := widget.NewLabelWithStyle("Arena Siege Survivors", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	buttons := container.NewHBox(l.wowBtn, l.downloadBtn, l.updatesBtn, layout.NewSpacer(), l.play)
-	l.win.SetContent(container.NewBorder(title, container.NewVBox(l.busyBox, buttons), nil, nil, l.logBox))
-	l.win.Resize(fyne.NewSize(760, 460))
+	title := widget.NewRichTextFromMarkdown("# Arena Siege Survivors\nAlways free. No microtransactions.")
+	logo := canvas.NewImageFromResource(fyne.NewStaticResource("logo.png", launcherLogo))
+	logo.FillMode = canvas.ImageFillContain
+	logo.SetMinSize(fyne.NewSize(88, 88))
+	header := container.NewBorder(nil, nil, logo, nil, title)
+	l.summary = widget.NewLabel("Welcome. Let's get your next run ready.")
+	l.summary.Wrapping = fyne.TextWrapWord
+	steps := widget.NewRichTextFromMarkdown("### Install once. Play whenever.\n**1 · Game**  Download the latest Arena Siege Survivors.\n\n**2 · Required files**  Install the Classic 1.12.1 client from Stonetavern.\n\n**3 · Play**  Create your hero in game. Future game updates are automatic.")
+	advanced := widget.NewAccordion(widget.NewAccordionItem("Options & troubleshooting", container.NewVBox(l.wowBtn, l.downloadBtn, l.updatesBtn, container.NewGridWrap(fyne.NewSize(620, 130), l.logBox))))
+	buttons := container.NewHBox(layout.NewSpacer(), l.play)
+	content := container.NewVBox(header, widget.NewSeparator(), l.summary, steps, l.busyBox, buttons, advanced)
+	l.win.SetContent(container.NewPadded(content))
+	l.win.Resize(fyne.NewSize(720, 620))
 	l.win.SetCloseIntercept(l.onClose)
 	return l
 }
@@ -170,22 +182,34 @@ func (l *launcher) start() {
 	}
 	l.showRelease()
 	l.update()
-	l.checkVCRedist()
 
+	// The first start: an account with a hidden name. The hero is made in game, step by step,
+	// the first time the game opens (name, race, class, artifact).
 	if !l.client.HasLogin() {
-		l.say("Welcome to Arena Siege Survivors!")
-		l.askCharacter()
-	}
-	if user, _, err := l.client.Login(); err == nil {
-		l.say("Character: " + user)
+		l.say("Welcome to Arena Siege Survivors! You'll create your hero when the game opens.")
+		if err := l.client.NewPlayer(); err != nil {
+			l.say("Could not make your account: " + err.Error())
+			l.installFailed()
+			return
+		}
 	}
 	if l.client.WoWData() == "" {
-		l.askWoWData("")
+		if !l.setupApproved && !l.installWelcome(l.client.Root) {
+			return
+		}
+		if !l.downloadDefaultClient() {
+			l.installFailed()
+			return
+		}
 	} else {
 		l.checkClientUpdate(false)
 	}
 	l.say("Game files: " + l.client.WoWData())
 	l.say("Ready. Press Play.")
+	fyne.Do(func() {
+		l.summary.SetText("Ready to play. Your game updates automatically; your saves stay yours.")
+		l.play.SetText("Play")
+	})
 	l.setButtons(true)
 }
 
@@ -228,63 +252,6 @@ func (l *launcher) update() {
 	}
 	l.showRelease()
 	l.say("Updated.")
-}
-
-// vcRedistURL is Microsoft's download of the latest Visual C++ Redistributable (x64).
-const vcRedistURL = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-
-// checkVCRedist offers to download the Microsoft Visual C++ Redistributable (x64), which the game
-// needs, if it is not installed. Not on the UI goroutine.
-func (l *launcher) checkVCRedist() {
-	if client.VCRedistInstalled() {
-		return
-	}
-	l.say("The Microsoft Visual C++ Redistributable (x64) is not installed; the game needs it to start.")
-	question := "Arena Siege Survivors needs the Microsoft Visual C++ Redistributable (x64), which is not installed. Download it from Microsoft now?"
-	if !l.confirm("Microsoft Visual C++ Redistributable", question) {
-		l.say("(Without it the game may not start. It can be downloaded from " + vcRedistURL + ")")
-		return
-	}
-	u, _ := url.Parse(vcRedistURL)
-	fyne.Do(func() {
-		if err := l.app.OpenURL(u); err != nil {
-			l.say("Could not open the download (" + err.Error() + "); get it from " + vcRedistURL)
-		}
-	})
-	l.say("Run the downloaded vc_redist.x64.exe to install it, then press Play.")
-}
-
-// askCharacter asks for a character name until the game server accepts one.
-func (l *launcher) askCharacter() {
-	for problem := ""; ; {
-		name := l.ask(func(done func(string)) {
-			entry := widget.NewEntry()
-			entry.SetPlaceHolder("2-12 letters")
-			entry.Validator = func(s string) error { _, err := client.CharacterName(s); return err }
-			items := []*widget.FormItem{widget.NewFormItem("Name", entry)}
-			if problem != "" {
-				items = append(items, widget.NewFormItem("", widget.NewLabel(problem)))
-			}
-			d := dialog.NewForm("Name your character", "Create", "Quit", items, func(ok bool) {
-				if !ok {
-					l.app.Quit()
-					return
-				}
-				done(entry.Text)
-			}, l.win)
-			d.Resize(fyne.NewSize(400, d.MinSize().Height))
-			d.Show()
-			l.win.Canvas().Focus(entry)
-		})
-		name, err := client.CharacterName(name)
-		if err == nil {
-			err = l.client.CreateCharacter(name)
-		}
-		if err == nil {
-			return
-		}
-		problem = err.Error()
-	}
 }
 
 // chooseDownload is what askWoWData's dialog answers when the player picks "Download one".
@@ -413,6 +380,10 @@ func (l *launcher) cancelJob() {
 
 // onPlay starts the game. While it runs, the Play button becomes a "Close game" button.
 func (l *launcher) onPlay() {
+	if l.client.Check() != nil || !l.client.HasLogin() || l.client.WoWData() == "" {
+		l.task(l.start)
+		return
+	}
 	ctx, finish := l.startJob("Closing the launcher closes the game too. Close it?")
 	l.enableButtons(false)
 	l.setPlayButton(true)
@@ -421,9 +392,6 @@ func (l *launcher) onPlay() {
 		finish()
 		if err != nil {
 			l.say("Error: " + err.Error())
-			if !client.VCRedistInstalled() {
-				l.say("The Microsoft Visual C++ Redistributable (x64) is not installed, which may be why. Get it from " + vcRedistURL)
-			}
 			fyne.Do(func() { dialog.ShowError(err, l.win) })
 		} else {
 			l.say("The game closed.")

@@ -46,7 +46,7 @@ func (l *launcher) rememberRoot() {
 }
 
 // findClient asks the player to download Arena Siege Survivors or show where it is, until one works.
-func (l *launcher) findClient() bool {
+func (l *launcher) findClientAdvanced() bool {
 	const (
 		optDownload = "Download the latest Arena Siege Survivors release into this folder"
 		optExisting = "Arena Siege Survivors is already in this folder"

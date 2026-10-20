@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	launcherRepo  = "danotchuuy/arena-siege-survivors-launcher"
+	launcherRepo  = "DeveloperJubs/arena-siege-survivors-launcher"
 	launcherAsset = "ArenaSiegeSurvivorsLauncher.exe" // as "make push" uploads it
 )
 

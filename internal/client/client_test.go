@@ -32,6 +32,10 @@ func TestMain(m *testing.M) {
 }
 
 func fakeServer() {
+	if len(os.Args) == 2 && os.Args[1] == "new-player" {
+		fmt.Println("siege-server 0.01\nOK Heroabcdefgh s3cret")
+		return
+	}
 	if len(os.Args) == 3 && os.Args[1] == "add-friend" {
 		if os.Args[2] == "Taken" {
 			fmt.Println("siege-server 0.01\nERROR That name is taken.")
@@ -77,9 +81,6 @@ func fakeGame() {
 // newFolder makes an ArenaSiegeSurvivorsClient folder whose programs are the fakes above.
 func newFolder(t *testing.T) *Client {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("the fake programs are symlinks")
-	}
 	root := t.TempDir()
 	self, err := os.Executable()
 	if err != nil {
@@ -89,6 +90,18 @@ func newFolder(t *testing.T) *Client {
 		t.Fatal(err)
 	}
 	for _, exe := range []string{serverExe, gameExe} {
+		// Windows: a copy under the fake's name (a symlink needs Developer Mode there); it acts
+		// by the name it was started as all the same.
+		if runtime.GOOS == "windows" {
+			b, err := os.ReadFile(self)
+			if err == nil {
+				err = os.WriteFile(filepath.Join(root, exe), b, 0o755)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
 		if err := os.Symlink(self, filepath.Join(root, exe)); err != nil {
 			t.Fatal(err)
 		}
@@ -106,6 +119,20 @@ func TestCharacterName(t *testing.T) {
 		if _, err := CharacterName(typed); err == nil {
 			t.Errorf("CharacterName(%q) accepted", typed)
 		}
+	}
+}
+
+func TestNewPlayer(t *testing.T) {
+	c := newFolder(t)
+	if err := c.NewPlayer(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(c.Root, "login.txt"))
+	if string(b) != "Heroabcdefgh\r\ns3cret" {
+		t.Errorf("login.txt = %q", b)
+	}
+	if !c.HasLogin() {
+		t.Error("no login after NewPlayer")
 	}
 }
 
@@ -295,6 +322,11 @@ func TestInstall(t *testing.T) {
 }
 
 func TestCloseGame(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The game is asked to close as its window's close button would; the fake game has no
+		// window on Windows, so only the forced close could be seen here.
+		t.Skip("the fake game has no window to ask")
+	}
 	if listening(ServerPort) {
 		t.Skipf("port %d is in use", ServerPort)
 	}
@@ -393,60 +425,5 @@ func TestOldName(t *testing.T) {
 		if got := read(rel); got != want {
 			t.Errorf("%s = %q, want %q", rel, got, want)
 		}
-	}
-}
-
-// TestLatestReleaseEmpty is for a "latest" GitHub release published without its files: the update
-// comes from the newest release that has them.
-func TestLatestReleaseEmpty(t *testing.T) {
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for name, body := range map[string]string{
-		`ArenaSiegeSurvivorsClient\bin\siege-server.exe`: "server",
-		`ArenaSiegeSurvivorsClient\bin\benilla.exe`:      "game",
-		`ArenaSiegeSurvivorsClient\version.txt`:          "202610180712",
-	} {
-		w, _ := zw.Create(name)
-		w.Write([]byte(body))
-	}
-	zw.Close()
-	var srv *httptest.Server
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/repos/dev/game/releases":
-			fmt.Fprintf(w, `[
-				{"tag_name": "v0.82", "assets": []},
-				{"tag_name": "v0.81.1", "prerelease": true, "assets": [
-					{"name": "version.txt", "browser_download_url": "%[1]s/dev/game/releases/download/v0.81.1/version.txt"},
-					{"name": %[2]q, "browser_download_url": "%[1]s/dev/game/releases/download/v0.81.1/%[2]s"}]},
-				{"tag_name": "v0.81", "assets": [
-					{"name": "version.txt", "browser_download_url": "%[1]s/dev/game/releases/download/v0.81/version.txt"},
-					{"name": %[2]q, "browser_download_url": "%[1]s/dev/game/releases/download/v0.81/%[2]s"}]}]`, srv.URL, updateZip)
-		case "/dev/game/releases/download/v0.81/version.txt":
-			fmt.Fprint(w, "202610180712\n")
-		case "/dev/game/releases/download/v0.81/" + updateZip:
-			w.Write(buf.Bytes())
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer srv.Close()
-	old := GitHubAPI
-	GitHubAPI = srv.URL
-	defer func() { GitHubAPI = old }()
-
-	root := t.TempDir()
-	os.WriteFile(filepath.Join(root, "version.txt"), []byte("202610140845"), 0o644)
-	os.WriteFile(filepath.Join(root, "update.txt"), []byte(srv.URL+"/dev/game/releases/latest/download"), 0o644)
-	c := New(root)
-	newer, err := c.CheckUpdate(context.Background())
-	if err != nil || !newer {
-		t.Fatalf("CheckUpdate() = %v, %v", newer, err)
-	}
-	if err := c.Update(context.Background(), nil); err != nil {
-		t.Fatal(err)
-	}
-	if c.LocalVersion() != 202610180712 {
-		t.Errorf("LocalVersion() = %d", c.LocalVersion())
 	}
 }

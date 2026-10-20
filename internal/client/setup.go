@@ -85,6 +85,44 @@ func (c *Client) CreateCharacter(name string) error {
 	return nil
 }
 
+// newPlayerRe is siege-server new-player's answer: the generated account and its password.
+var newPlayerRe = regexp.MustCompile(`(?m)^OK (\S+) (\S+)`)
+
+// NewPlayer makes an account with a hidden, generated name (siege-server new-player) and writes
+// login.txt. The player names their hero in game, step by step, the first time it opens.
+func (c *Client) NewPlayer() error {
+	if err := os.MkdirAll(c.path("game", "data"), 0o755); err != nil {
+		return err
+	}
+	cmd := exec.Command(c.path(serverExe), "new-player")
+	cmd.Dir = c.path("game")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	hideWindow(cmd)
+	out, runErr := cmd.Output()
+
+	m := newPlayerRe.FindSubmatch(out)
+	if m == nil {
+		msg := strings.TrimSpace(errorRe.ReplaceAllString(string(out), ""))
+		if msg == "" {
+			msg = strings.TrimSpace(stderr.String())
+		}
+		if msg == "" && runErr != nil {
+			msg = runErr.Error()
+		}
+		if msg == "" {
+			msg = "the game server did not make the account"
+		}
+		return errors.New(msg)
+	}
+	login := string(m[1]) + "\r\n" + string(m[2])
+	if err := os.WriteFile(c.path("login.txt"), []byte(login), 0o600); err != nil {
+		return err
+	}
+	_ = os.Remove(c.path("game", "data", "local-login.txt"))
+	return nil
+}
+
 // ValidWoWData checks that dir is a WoW 1.12.1 "Data" folder.
 func ValidWoWData(dir string) error {
 	if dir == "" {
