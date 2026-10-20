@@ -32,6 +32,15 @@ func (l *launcher) locateClient() bool {
 			return true
 		}
 	}
+	if !l.explicitRoot {
+		if result := l.detectExisting(); result != 0 {
+			if result < 0 {
+				l.installFailed()
+				return false
+			}
+			return true
+		}
+	}
 	if !l.findClient() {
 		return false
 	}

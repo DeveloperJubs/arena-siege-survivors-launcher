@@ -21,3 +21,4 @@ The game stays free. No microtransactions; cosmetics and player power are earned
 Windows release builds need Go and MinGW-w64. Build using the existing Makefile. Keep the app ID and legacy executable alias for existing-player self-updates. Preview binaries use `dev-one-click` and deliberately do not self-update. Public signing and release remain a separate step.
 
 Existing installs and Rogue Arena migrations continue to use the existing updater and local save paths.
+The launcher automatically checks remembered, nearby, Downloads, Desktop, Documents and common Games folders for an existing complete Arena Siege/Rogue Arena installation. One match is reused; multiple matches ask which folder contains your progress. A custom -root path remains authoritative. No match keeps the one-button new install.
