@@ -182,6 +182,7 @@ func (l *launcher) start() {
 	}
 	l.showRelease()
 	l.update()
+	l.checkVCRedist()
 
 	// The first start: an account with a hidden name. The hero is made in game, step by step,
 	// the first time the game opens (name, race, class, artifact).
