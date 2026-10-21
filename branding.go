@@ -10,6 +10,13 @@ import (
 //go:embed assets/logo.png
 var launcherLogo []byte
 
+// The launcher's icon: the game's, with an "L" badge. The window and taskbar use this PNG; the
+// .exe uses the same art from assets/launcher.ico, compiled into rsrc_windows_amd64.syso (rc.exe,
+// then cvtres.exe, with its two section-less symbols moved to section 1 for the Go linker).
+//
+//go:embed assets/launcher-icon.png
+var launcherIcon []byte
+
 type siegeTheme struct{}
 
 func (siegeTheme) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {

@@ -27,6 +27,9 @@ func TestMain(m *testing.M) {
 	case "benilla.exe":
 		fakeGame()
 	default:
+		// Never the real desktop.
+		createShortcut = func(name, target, workDir string) error { return nil }
+		renameShortcut = func(oldName, newName, workDir string) error { return nil }
 		os.Exit(m.Run())
 	}
 }

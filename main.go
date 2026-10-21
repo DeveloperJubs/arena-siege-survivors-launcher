@@ -42,6 +42,7 @@ func main() {
 
 	// The ID keeps the launcher's old name: its saved settings are filed under it.
 	a := app.NewWithID("io.github.danotchuuy.roguearenalauncher")
+	a.SetIcon(fyne.NewStaticResource("launcher-icon.png", launcherIcon))
 	a.Settings().SetTheme(siegeTheme{})
 	l := newLauncher(a, client.New(root))
 	l.explicitRoot = *rootFlag != ""
@@ -72,6 +73,7 @@ type launcher struct {
 	wowBtn      *widget.Button
 	downloadBtn *widget.Button
 	updatesBtn  *widget.Button
+	steamBtn    *widget.Button
 
 	mu  sync.Mutex
 	job *job // the game or a download, while one runs
@@ -109,9 +111,12 @@ func newLauncher(a fyne.App, c *client.Client) *launcher {
 	l.updatesBtn = widget.NewButtonWithIcon("Check for updates", theme.ViewRefreshIcon(), func() {
 		l.task(l.checkForUpdates)
 	})
+	l.steamBtn = widget.NewButtonWithIcon("Add to Steam", steamIcon, func() {
+		l.task(l.addToSteam)
+	})
 	l.setButtons(false)
 
-	title := widget.NewRichTextFromMarkdown("# Arena Siege Survivors\nAlways free. No microtransactions.")
+	title := widget.NewRichTextFromMarkdown("# Arena Siege Survivors\nAlways free. No microtransactions. We're back gamers.")
 	logo := canvas.NewImageFromResource(fyne.NewStaticResource("logo.png", launcherLogo))
 	logo.FillMode = canvas.ImageFillContain
 	logo.SetMinSize(fyne.NewSize(88, 88))
@@ -120,7 +125,7 @@ func newLauncher(a fyne.App, c *client.Client) *launcher {
 	l.summary.Wrapping = fyne.TextWrapWord
 	steps := widget.NewRichTextFromMarkdown("### Install once. Play whenever.\n**1 · Game**  Download the latest Arena Siege Survivors.\n\n**2 · Required files**  Install the Classic 1.12.1 client from Stonetavern.\n\n**3 · Play**  Create your hero in game. Future game updates are automatic.")
 	advanced := widget.NewAccordion(widget.NewAccordionItem("Options & troubleshooting", container.NewVBox(l.wowBtn, l.downloadBtn, l.updatesBtn, container.NewGridWrap(fyne.NewSize(620, 130), l.logBox))))
-	buttons := container.NewHBox(layout.NewSpacer(), l.play)
+	buttons := container.NewHBox(append(l.socialBadges(), layout.NewSpacer(), l.steamBtn, l.play)...)
 	content := container.NewVBox(header, widget.NewSeparator(), l.summary, steps, l.busyBox, buttons, advanced)
 	l.win.SetContent(container.NewPadded(content))
 	l.win.Resize(fyne.NewSize(720, 620))
@@ -152,7 +157,7 @@ func (l *launcher) setButtons(on bool) {
 
 // enableButtons is setButtons on the UI goroutine.
 func (l *launcher) enableButtons(on bool) {
-	for _, b := range []*widget.Button{l.play, l.wowBtn, l.downloadBtn, l.updatesBtn} {
+	for _, b := range []*widget.Button{l.play, l.wowBtn, l.downloadBtn, l.updatesBtn, l.steamBtn} {
 		if on {
 			b.Enable()
 		} else {
@@ -173,6 +178,7 @@ func (l *launcher) task(fn func()) {
 // start runs the steps before the game can be played: updates, then the first-start setup.
 func (l *launcher) start() {
 	l.say("Arena Siege Survivors Launcher " + version)
+	go l.showSteamState()
 	cleanupLauncherUpdate()
 	if l.updateLauncher(false) {
 		return
